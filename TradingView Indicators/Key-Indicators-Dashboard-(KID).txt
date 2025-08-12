@@ -1,0 +1,724 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Byte2Bull
+//
+//==============================================================================
+//  Key Indicators Dashboard (KID) - by Naved Iqbal © Byte2Bull
+//==============================================================================
+//
+//  🧑‍💻 Author: Naved Iqbal
+//  📍 Country: India
+//  💼 Profession: Software Engineer
+//  🎯 Passion: Equity Trader & Quant Strategy Developer
+//
+//  📬 Email: navediqbal5@gmail.com
+//  🛠️ Release Version: 1.0
+//  📆 Last Update: 13-August-2025
+//
+//  🔍 About this Script:
+//  Key Indicators Dashboard (KID) is a powerful all-in-one technical analysis tool.
+//  It visually displays key metrics such as:
+//  - ADR, ATR (%, value)
+//  - Relative Strength vs benchmark
+//  - RS Score (IBD-style)
+//  - Daily Turnover
+//  - Moving Averages, MA Extensions and Crossovers
+//  - Minervini Trend Template
+//  - PowerBar (Purple Dot) and 52W High/Low Markers
+//  - Inside Bar, Tightness and Bollinger Band Squeeze Indicator
+//
+//  All signals are dynamically color-coded in a compact, customizable table.
+//  The script also includes alert conditions and full control over indicator settings.
+//
+//
+//==============================================================================
+
+//@version=6
+indicator(title = "Key Indicators Dashboard (KID)", shorttitle = "KID", overlay=true)
+
+// String Labels
+string toolTip = "Length/Period: The period (or data points) used for calculating the indicator.\n\nThreshold:  The minimum indicator value; if the indicator value is less than this, it is displayed in red background color."
+string toolTipLength = "Length/Period: The period (or data points) used for calculating the indicator."
+string toolTipThreshold = "The minimum indicator value; if the indicator value is less than this, it is displayed in red background color."
+string tooltipSwingLookback = "Number of bars before and after the current candle to consider for swing high/low detection."
+string labelADR = "ADR %"
+string labelATR = "ATR"
+string labelATRPer = "ATR %"
+string labelRS = "RS"
+string labelRVol = "RVol"
+string labelTurnover = "Turnover (In Cr)"
+string labelRSRating = "RS Score"
+string labelMAExtension = "MA Ext."
+string label52WHigh = "52W High"
+string label52WLow = "52W Low"
+string labelMarketCap = "MarketCap"
+string labelFreeFloat = "Free Float"
+string labelTrend = "Trend"
+string lableMinerviniTT = "MTT"
+string labelSector = "Sector"
+string labelIndustry = "Industry"
+string labelTightness = "Mark Tightness"
+string labelLastCandleHigh = "LastCandleHigh"
+string label52WHighLowLine = "52WHighLowLine"
+string labelTableOrientation = "Table Orientation"
+string labelThreshold = "Threshold"
+string labelCrossInput = "MA Crossover"
+string titleLength = " | Length"
+string ma1Label = "MA-1"
+string ma2Label = "MA-2"
+string ma3Label = "MA-3"
+string ma4Label = "MA-4"
+
+//===================================================================================
+//------------------------------------ TABLE INPUT  ---------------------------------
+//===================================================================================
+string GRP1 = "════════════════ Table Inputs ════════════════"
+displayADR = input.bool(true, title=labelADR, inline=labelADR, group=GRP1)
+adrLength = input.int(20, title=titleLength, tooltip = toolTip, inline=labelADR, group=GRP1)
+thresholdADR = input.float(2.0, title=labelThreshold, minval=0.1, maxval=100.0, step=0.1, inline =labelADR, group=GRP1)
+
+displayATRP = input.bool(false, title=labelATRPer, inline=labelATR, group=GRP1)
+displayATR = input.bool(false, title=labelATR, inline = labelATR, group=GRP1)
+atrLength = input(14, title=titleLength, tooltip = toolTipLength, inline = labelATR, group=GRP1)
+thresholdATRP = input.float(2.0, title=labelThreshold, minval=0.1, maxval=100.0, step=0.1, inline = labelATR, group=GRP1)
+
+displayRelStrength = input.bool(true, title=labelRS, inline = labelRS, group=GRP1)
+comparativeTickerId = input.symbol('NSE:NIFTYMIDSML400', title='Comparative Symbol', inline = labelRS, group=GRP1)
+relStrengthLength = input(50, title="RS Period", tooltip = toolTip, inline = "RS_Length_Threshold", group=GRP1)
+thresholdRelStrength = input.float(0.0, title=labelThreshold, maxval=100.0, step=0.1, inline = "RS_Length_Threshold", group=GRP1)
+
+displayRSRating = input.bool(true, "Display RS Score", inline = labelRSRating, group=GRP1)
+thresholdRSScore = input.float(60.0, title=labelThreshold, tooltip = toolTipThreshold, minval=1.0, maxval=100.0, step=0.1, inline=labelRSRating, group=GRP1)
+
+displayRVol = input.bool(false, title=labelRVol, inline = labelRVol, group=GRP1)
+rvolLength = input(50, title=titleLength, tooltip = toolTip, inline = labelRVol, group=GRP1)
+thresholRVol = input.float(100.0, title=labelThreshold, minval=0.1, step=0.1, inline = labelRVol, group=GRP1)
+
+displayTurnover = input.bool(false, title=labelTurnover , inline = labelTurnover, group=GRP1)
+turnoverCalPeriod = input(50, title=" | Period", inline = labelTurnover, group=GRP1)
+thresholdTurnover = input.float(5.0, title=labelThreshold, tooltip = toolTipThreshold, minval=0.1, step=0.1, inline = labelTurnover, group=GRP1)
+
+displayMAExtension = input.bool(true, "MA Extension", group=GRP1, inline = labelMAExtension, tooltip="Display MA extension in table")
+maExtLength = input(21, title=titleLength, tooltip = toolTip, group=GRP1, inline = labelMAExtension)
+maType = input.string(title="", defval="EMA", options=["EMA", "SMA"], group=GRP1, inline = labelMAExtension)
+thresholdMAExtInATR = input.float(6.0, title="Extension Threshold (in ATRs)", tooltip = toolTipThreshold, minval=0.1, step=0.1, inline = "MinMaxMAExt" ,group=GRP1)
+
+markMAExtension = input.bool(true, "Mark Extension | ", group=GRP1, inline = "maextension", tooltip = "Add Extension Marker Above Candle")
+maextShapeStyle = input.string("flag", title = "Shape", options = ["diamond", "circle", "cross", "triangleup", "triangledown", "square", "arrowup", "arrowdown", "labelup", "labeldown", "xcross", "flag"], inline = "maextension", group = GRP1)
+maextMarkerColor = input.color(defval = color.red, title = "", inline= "maextension", group = GRP1)
+
+
+display52WHigh = input.bool(true, "Display 52 Weeks High", group=GRP1)
+display52WLow = input.bool(true, "Display 52 Weeks Low", group=GRP1)
+
+period52Weeks = input(defval=252, title='52 Weeks Period (In Days)', group=GRP1)
+threshold52WHigh = input(defval=25, title='52 Weeks High | Threshold %', group=GRP1)
+threshold52WLow = input(defval=30, title='52 Weeks Low | Threshold %', group=GRP1)
+
+displayMarketCap = input.bool(true, title=labelMarketCap, inline=labelMarketCap, group=GRP1)
+thresholdMcap = input.float(500.0, title=labelThreshold, tooltip=toolTipThreshold, minval=0.1, step=0.1, inline=labelMarketCap, group=GRP1)
+
+displayFreeFloat = input.bool(false, "Display Free Float", group=GRP1)
+
+displayTrend = input.bool(true, "Display Trend", tooltip = "Uses Supertrend to find trend (Up/Down)", group=GRP1)
+
+displayMinerviniTrendTemplate = input.bool(false, "Display Minervini Trend Template", group=GRP1, inline = "TrendTemplate")
+trendTemplateMAType = input.string("EMA", title="", options=["EMA", "SMA"], group = GRP1, inline = "TrendTemplate")
+
+displaySector = input.bool(false, "Display Sector", group=GRP1)
+
+displayIndustry = input.bool(true, "Display Industry", group=GRP1)
+
+//===================================================================================
+//-------------------------------- TABLE OPTIONS ------------------------------------
+//===================================================================================
+string GRP2 = "══════════════ Table Customization ════════════"
+displayTable = input.bool(true, "Display Table", group=GRP2)
+toggleDarkColors = input(title="Dark Mode", defval=false, group=GRP2)
+tableOrientation = input.string(title="Table Orientation", defval="Horizontal", options =["Vertical", "Horizontal"], group=GRP2)
+
+string tablesize = input.string("small",  "Size",      inline = labelTableOrientation, group = GRP2, options = ["tiny", "small", "normal", "large", "huge", "auto"])
+string tableposY = input.string("top", "↕",         inline = labelTableOrientation, group = GRP2, options = ["top", "middle", "bottom"])
+string tableposX = input.string("right",   "↔",         inline = labelTableOrientation, group = GRP2, options = ["left", "center", "right"])
+
+ColorBackground = toggleDarkColors ? input(color.new(color.black, 0), "Background Color (dark-mode)", inline = labelTableOrientation,group=GRP2) : input(color.new(color.white, 0), "Background Color (light-mode)", inline = labelTableOrientation, group=GRP2)
+TextCol = toggleDarkColors ? input(color.new(color.white, 0), "Text Color (dark-mode)", inline = labelTableOrientation,group=GRP2) : input(color.new(color.black, 0), "Text Color (light-mode)", inline = labelTableOrientation, group=GRP2)
+
+ColorGreenText = toggleDarkColors ? color.new(color.white, 0) : color.new(color.green, 0)
+ColorOrangeText = toggleDarkColors ? color.new(color.white, 0) : color.new(color.orange, 0)
+
+
+//===================================================================================
+//-------------------------------- MOVING AVERAGES PLOTTING  ------------------------
+//===================================================================================
+string GRP3 = '════════════════ Moving Averages ══════════════'
+plotMA1 = input.bool(true, title = ma1Label, group = GRP3, inline = ma1Label)
+ma1Type = input.string("EMA", title="", options=["EMA", "SMA"], group = GRP3, inline = ma1Label)
+ma1Src = input(close, title="", group = GRP3, inline = ma1Label)
+ma1Length = input.int(10, "", minval=1, group = GRP3, inline = ma1Label)
+ma1Color = input.color(defval=color.orange, title="", group = GRP3, inline = ma1Label)
+
+plotMA2 = input.bool(true, ma2Label, group = GRP3, inline = ma2Label)
+ma2Type = input.string("EMA", title="", options=["EMA", "SMA"], group = GRP3, inline = ma2Label)
+ma2Src = input(close, title="", group = GRP3, inline = ma2Label)
+ma2Length        = input.int(20, "", minval=1, group = GRP3, inline = ma2Label)
+ma2Color = input.color(defval=color.blue, title="", group = GRP3, inline = ma2Label)
+
+plotMA3 = input.bool(true, ma3Label, group = GRP3, inline = ma3Label)
+ma3Type = input.string("EMA", title="", options=["EMA", "SMA"], group = GRP3, inline = ma3Label)
+ma3Src = input(close, title="", group = GRP3, inline = ma3Label)
+ma3Length = input.int(50, "", minval=1, group = GRP3, inline = ma3Label)
+ma3Color = input.color(defval=color.green, title="", group = GRP3, inline = ma3Label)
+
+plotMA4 = input.bool(true, ma4Label, group = GRP3, inline = ma4Label)
+ma4Type = input.string("EMA", title="", options=["EMA", "SMA"], group = GRP3, inline = ma4Label)
+ma4Src = input(close, title="", group = GRP3, inline = ma4Label)
+ma4Length = input.int(200, "", minval=1, group = GRP3, inline = ma4Label)
+ma4Color = input.color(defval=color.red, title="", group = GRP3, inline = ma4Label)
+
+displayMACross = input.bool(false, title = labelCrossInput, group = GRP3)
+shortMAInput = input.string(ma1Label, title="", options=[ma1Label, ma2Label, ma3Label, ma4Label], group = GRP3, inline = labelCrossInput)
+longMAInput = input.string(ma2Label, title="", options=[ma1Label, ma2Label, ma3Label, ma4Label], group = GRP3, inline = labelCrossInput)
+
+//===================================================================================
+//------------------------------------ INSIDE BAR (IB) ------------------------------
+//===================================================================================
+string GRP4 = '═══════════════ Inside Bar (IB) ═══════════════'
+markInsideBar = input.bool(false, "Color Inside Bar (IB) ", inline="IBColor", group=GRP4)
+bullishInsideBarColor = input.color(defval=color.orange, title="Bullish", inline="IBColor", group = GRP4)
+bearishInsideBarColor = input.color(defval=color.orange, title="Bearish", inline="IBColor", group = GRP4)
+showIBLabels = input.bool(false, "Show Labels", group=GRP4)
+markOnlyRecentIB = input.bool(false, "Recent Only", group=GRP4)
+
+
+//===================================================================================
+//---------------------------------- TIGHTNESS -------------------------------------
+//===================================================================================
+string GRP5 = '═════════════════ Tightness ════════════════'
+markTightness = input.bool(false, title=labelTightness, group=GRP5)
+tightnesslookBack = input.int(3, 'Tight Candles (Lookback)', minval = 1, inline= labelTightness, group=GRP5)
+tightnessADRLength = input.int(14, 'ADR Length', minval = 1, inline= labelTightness, group=GRP5)
+tightnessShapeStyle = input.string("cross", title = "Shape", options = ["diamond", "circle", "cross", "triangleup", "triangledown", "square", "arrowup", "arrowdown", "labelup", "labeldown", "xcross", "flag"], inline = "tightnessShapeStyle", group = GRP5)
+tightnessMarkerColor = input.color(defval = color.orange, title = "", inline= "tightnessShapeStyle", group = GRP5)
+
+
+//===================================================================================
+//----------------------------- POWER BAR (PURPLE DOT) ------------------------------
+//===================================================================================
+string GRP6 = '════════════ PowerBar (Purple Dot) ════════════'
+displayPurpleDot = input.bool(false, "Mark PowerBar", group = GRP6)
+percentChange = input.float(5, title="ROC Threshold (%)", group = GRP6)
+volThreshold = input.int(500000, title="Volume Threshold", group = GRP6)
+powerBarShapeStyle = input.string("circle", title = "Shape", options = ["diamond", "circle", "cross", "triangleup", "triangledown", "square", "arrowup", "arrowdown", "labelup", "labeldown", "xcross", "flag"], inline = "powerBar", group = GRP6)
+powerBarMarkerColor = input.color(defval = color.purple, title = "", inline= "powerBar", group = GRP6)
+
+
+//===================================================================================
+//----------------------------------- SQUEEZING RANGE -------------------------------
+//===================================================================================
+string GRP7 = '════════════ Squeezing Range ════════════'
+markSqueezingRange = input.bool(false, "Mark Squeezing Range", group=GRP7, tooltip = "Indicates Bollinger Bands are narrow, indicating reduced volatility and consolidation.\n\nUpperBB - LowerBB < ATR × 2")
+bbLength = input.int(20, 'BB Length', group=GRP7, tooltip="Number of bars used to calculate the Bollinger Bands' moving average.")
+bbMult = input.float(2.0, 'BB StdDev Multiplier', group=GRP7, tooltip="Standard deviation multiplier for Bollinger Bands.\n\nHigher values widen the bands, lower values narrow them.")
+atrLengthSQ = input.int(14, 'ATR Length', group=GRP7, tooltip="Number of bars used to calculate the Average True Range (ATR).")
+atrMultSQ = input.float(2.0, 'ATR Multiplier', group=GRP7, tooltip="Multiplier applied to ATR when comparing with Bollinger Band range.")
+lookbackSQ = input.int(3, 'Squeeze Lookback', minval = 1, group=GRP7, tooltip = 'Number of consecutive days the squeeze condition must be true')
+squeezeShapeStyle = input.string("triangleup", title = "Shape", options = ["diamond", "circle", "cross", "triangleup", "triangledown", "square", "arrowup", "arrowdown", "labelup", "labeldown", "xcross", "flag"], inline = "Squeeze", group = GRP7)
+squeezeMarkerColor = input.color(defval = color.green, title = "", inline= "Squeeze", group = GRP7)
+
+
+//===================================================================================
+//---------------------------------- 52-WEEKS HIGH and Low -------------------------------------
+//===================================================================================
+string GRP8 = '═════════════ 52-Weeks High & Low ═════════════'
+mark52WeeksHighAndLow = input.bool(false, "Mark 52 Weeks High and Low", inline=label52WHighLowLine, group=GRP8)
+high52WLineColor = input.color(defval=color.green, title="", inline=label52WHighLowLine, group = GRP8)
+low52WLineColor = input.color(defval=color.red, title="", inline=label52WHighLowLine, group = GRP8)
+textSize52WHL = input.string("small", "Label Size", options=["tiny", "small", "normal", "large", "huge"], inline="52WHighLowLabel", group=GRP8)
+lineWidth52WHighLow = input.int(1, title="Line Width", minval=1, maxval=10, inline="52WHighLowLabel", group = GRP8)
+
+
+//===================================================================================
+//------------------------------- PINE SCREENER OPTIONS  ----------------------------
+//===================================================================================
+string GRP9 = '═════════════ Pine Screener Options ═══════════'
+minimumPrice = input.float(25.0, "Price >=",     minval = 1.0, step = 0.1, group = GRP9)
+maximumPrice = input.float(10000.0, "Price <=",     minval = 1.0, step = 0.1, group = GRP9)
+
+maxDailyPriceChange = input.float(5.0, "Price Change (%) <=", minval = 0.1, step = 0.1, group = GRP9)
+minDailyPriceChange = input.float(-5.0, "Price Change (%) >=", minval = -100.0, maxval = -0.1, step = 0.1, group = GRP9)
+
+
+//===================================================================================
+//-------------------------------- CALCULATIONS -------------------------------------
+//===================================================================================
+
+dclose = request.security(syminfo.tickerid, 'D', close)
+dhigh = request.security(syminfo.tickerid, 'D', high)
+dlow = request.security(syminfo.tickerid, 'D', low)
+dvolume = request.security(syminfo.tickerid, 'D', volume)
+
+
+//---------------------- ADR ------------------
+adr = 100 * (ta.sma(dhigh / dlow, adrLength) - 1)
+
+// -------------------- ATR -------------------
+atr = ta.atr(atrLength)
+atrPercent = (atr / close) * 100
+
+// ----------- Relative Strength (RS) ---------
+comparativeSymbol = request.security(comparativeTickerId, 'D', close)
+rs = dclose / dclose[relStrengthLength] / (comparativeSymbol / comparativeSymbol[relStrengthLength]) - 1
+
+// ------------ RS Rating (IBD style) ---------
+// Weighted average of stock’s price changes over 63, 126, 189, and 252 days.
+ThreeMthRS  = 0.4 * (dclose / dclose[63])
+SixMthRS    = 0.2 * (dclose / dclose[126])
+NineMthRS   = 0.2 * (dclose / dclose[189])
+TwelveMthRS = 0.2 * (dclose / dclose[252])
+
+rsRatingRaw = ThreeMthRS + SixMthRS + NineMthRS + TwelveMthRS
+rsPercent = (rsRatingRaw - 1) * 100  // e.g., 10% if raw is 1.10
+
+// === Normalize RS Rating to 1–100 scale ===
+rsMin = ta.lowest(rsPercent, 252)
+rsMax = ta.highest(rsPercent, 252)
+rsScore = 1 + 99 * (rsPercent - rsMin) / math.max(rsMax - rsMin, 1e-6)  // Avoid division by zero
+
+
+// --------------- Relative Volume ------------
+timeFrameRVol = timeframe.isweekly ? "W" : timeframe.ismonthly ? "M" : "D"
+today_vol = request.security(syminfo.tickerid, timeFrameRVol, volume)
+yday_vol = request.security(syminfo.tickerid, timeFrameRVol, volume[1])
+avg_vol = request.security(syminfo.tickerid, timeFrameRVol, ta.sma(yday_vol, rvolLength))
+rvolPercent = math.round((today_vol / avg_vol ) * 100)
+
+// ---------- Turnover (Avg ₹/$ Volume) -------
+turnover = dclose * dvolume / 1e7  // Convert to crores
+avgTurnoverInCr = ta.sma(turnover, turnoverCalPeriod)  // Moving Average of Turnover
+
+
+// Function to get shape object
+f_getShape(shapeStr) =>
+    switch shapeStr
+        "circle" => shape.circle
+        "cross" => shape.cross
+        "triangleup" => shape.triangleup
+        "triangledown" => shape.triangledown
+        "arrowup" => shape.arrowup
+        "arrowdown" => shape.arrowdown
+        "labelup" => shape.labelup
+        "labeldown" => shape.labeldown
+        "square" => shape.square
+        "xcross" => shape.xcross
+        "flag" => shape.flag
+        => shape.triangleup  // default
+
+
+// ------------- MA for MA-Extension ----------
+ma = maType == "EMA" ? ta.ema(close, maExtLength) : ta.sma(close, maExtLength)
+maExtPercent = ((close - ma) / ma) * 100
+atrExtension = maExtPercent/ atrPercent
+// Add Extension Marker Above Candle
+selectedMAExtMarkerShape = f_getShape(maextShapeStyle)
+plotshape(markMAExtension and atrExtension >= thresholdMAExtInATR, title = 'Extended', style = selectedMAExtMarkerShape, location = location.abovebar, color = maextMarkerColor)
+
+
+//-------------- 52-Weeks High and Low --------
+high52W = ta.highest(dhigh, period52Weeks)
+low52W = ta.lowest(dlow, period52Weeks)
+// Percentage below 52-week high
+pct_below_52W_high = math.round(((high52W - dclose) / high52W) * 100, 2)
+// Percentage above 52-week low
+pct_above_52W_low = math.round(((dclose - low52W) / low52W) * 100, 2)
+
+
+// ------------- MarketCap/Free Float ----------
+TSO = syminfo.shares_outstanding_total
+FSO = syminfo.shares_outstanding_float
+marketCapInCr = TSO * dclose / 1e7 // Market Cap in Crore
+freeFloatInCr = FSO * dclose / 1e7 // Free Float in Crore
+freeFloatPct = (FSO / TSO) * 100
+
+
+//  ------------------ Trend  -----------------
+[supertrend, direction] = ta.supertrend(3, 10)
+trend = direction < 0 ? "Up" : "Down"
+
+
+//  ---------- Minervini Trend Template -------
+ma50 = trendTemplateMAType == "EMA" ? ta.ema(dclose, 50) : ta.sma(dclose, 50)
+ma150 = trendTemplateMAType == "EMA" ? ta.ema(dclose, 150) : ta.sma(dclose, 150)
+ma200 = trendTemplateMAType == "EMA" ? ta.ema(dclose, 200) : ta.sma(dclose, 200)
+
+ma200_1m_ago = ma200[21]  // 1 month ago (approx. 21 trading days)
+
+cond1 = dclose > ma150 and dclose > ma200   // 1. The current stock price is above both the 150-day (30-week) and the 200-day (40-week) moving average price lines.
+cond2 = ma150 > ma200                       // 2. The 150-day moving average is above the 200-day moving average.
+cond3 = ma200 > ma200_1m_ago                // 3. The 200-day moving average line is trending up for at least 1 month (preferably 4-5 months minimum in most cases).
+cond4 = ma50 > ma150 and ma150 > ma200      // 4. The 50-day (10-week) moving average is above both the 150-day and 200-day moving averages.
+cond5 = dclose > ma50                       // 5. The current stock price is trading above the 50-day moving average.
+cond6 = dclose >= (low52W * 1.3)            // 6. The current stock price is at least 30% above its 52-week low.
+cond7 = dclose >= (high52W * 0.75)          // 7. The current stock price is within at least 25 percent of its 52-week high (the closer to a new high the better).
+// cond8 = rsRating >= 70                   // 8. The relative strength ranking (as reported in IBD) is no less than 70, and preferably in the 80s or 90s
+// === All Conditions Met | Alert ====
+minervini_trend_template_conditions = cond1 and cond2 and cond3 and cond4 and cond5 and cond6 and cond7 // and cond8
+minervini_trend_template_status = na(dclose[252]) ? '-' : minervini_trend_template_conditions ? '✓' : 'x'
+
+
+// ------------------ Sector/Industry ---------
+sector = syminfo.sector
+industry = syminfo.industry
+
+
+// ------------- Moving Averages --------------
+ma1 = ma1Type == "EMA" ? ta.ema(ma1Src, ma1Length) : ta.sma(ma1Src, ma1Length)
+plot(plotMA1 ? ma1 : na, color=ma1Color, title = "MA-1")
+
+ma2 = ma2Type == "EMA" ? ta.ema(ma2Src, ma2Length) : ta.sma(ma2Src, ma2Length)
+plot(plotMA2 ? ma2 : na, color=ma2Color, title = "MA-2")
+
+ma3 = ma3Type == "EMA" ? ta.ema(ma3Src, ma3Length) : ta.sma(ma3Src, ma3Length)
+plot(plotMA3 ? ma3 : na, color=ma3Color, title = "MA-3")
+
+ma4 = ma4Type == "EMA" ? ta.ema(ma4Src, ma4Length) : ta.sma(ma4Src, ma4Length)
+plot(plotMA4 ? ma4 : na, color=ma4Color, title = "MA-4")
+
+
+// -------------- MA Crossover ----------------
+getMA(maLabel) =>
+    maLabel == ma1Label ? ma1 : maLabel == ma2Label ? ma2 : maLabel == ma3Label ? ma3 : maLabel == ma4Label ? ma4 : na
+
+shortMA = getMA(shortMAInput)
+longMA = getMA(longMAInput)
+
+isMACrossOver = false
+isMACrossOver := ta.cross(shortMA, longMA)
+plot(displayMACross and isMACrossOver ? shortMA : na, color=color.blue, style = plot.style_cross, linewidth = 4, title="MA Cross")
+
+
+// ---------------- Inside Bar ----------------
+bullishBar = 1
+bearishBar = -1
+isInside() =>
+    previousBar = 1
+    bodyStatus = close >= open ? 1 : -1
+    isInsidePattern = high < high[previousBar] and low > low[previousBar]
+    isInsidePattern ? bodyStatus : 0
+ 
+showOnlyLastIB = markOnlyRecentIB ? barstate.islast ? true : false : true
+// Change Inside Bar Color
+barcolor(showOnlyLastIB and markInsideBar and isInside() == bullishBar ? bullishInsideBarColor : showOnlyLastIB and markInsideBar and isInside() == bearishBar ? bearishInsideBarColor : na )
+// Mark Inside Bar
+plotshape(showIBLabels and showOnlyLastIB and isInside() == bullishBar, title="IB", style=shape.arrowup, location=location.belowbar, size=size.tiny, text="IB", textcolor = color.green, color=color.green)
+plotshape(showIBLabels and showOnlyLastIB and isInside() == bearishBar, title="IB", style=shape.arrowup, location=location.belowbar, size=size.tiny, text="IB", textcolor = color.red, color=color.red)
+
+
+//------------------ Tightness ----------------
+adr_tightness = ta.sma(high - low, tightnessADRLength)
+highestHigh = ta.highest(high, tightnesslookBack)
+lowestLow = ta.lowest(low, tightnesslookBack)
+combinedRange = highestHigh - lowestLow
+// Condition for Tightness
+isTight = combinedRange < adr_tightness
+// Mark Tightness
+selectedTightnessMarkerShape = f_getShape(tightnessShapeStyle)
+plotshape(markTightness and isTight, title = "Tightness", location = location.belowbar, style = selectedTightnessMarkerShape, color = tightnessMarkerColor, size = size.tiny)
+
+
+// ---------- PowerBar (Purple Dot) -----------
+roc_condition = math.abs(ta.roc(close, 1)) >= percentChange
+volume_condition = volume >= volThreshold
+// Mark Power Bar
+selectedPowerBarMarkerShape = f_getShape(powerBarShapeStyle)
+plotshape(displayPurpleDot ? (roc_condition and volume_condition) : false, title="PowerBar (Purple Dot)" , location=location.belowbar, style=selectedPowerBarMarkerShape, color=powerBarMarkerColor)
+
+
+// ---------- PowerBar (Purple Dot) -----------
+// Bollinger Bands
+basis = ta.sma(close, bbLength)
+dev = bbMult * ta.stdev(close, bbLength)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// ATR
+atrSQ = ta.atr(atrLengthSQ)
+
+// BB Range
+bbRange = upperBB - lowerBB
+
+// Squeeze condition for one bar
+squeezeCond = bbRange < atrSQ * atrMultSQ
+
+// Function to check N consecutive bars
+var bool squeezeN = false
+squeezeN := true
+for i = 0 to lookbackSQ - 1 by 1
+    squeezeN := squeezeN and squeezeCond[i]
+    squeezeN
+
+// Mark Squeeze
+selectedSQMarkerShape = f_getShape(squeezeShapeStyle)
+plotshape(markSqueezingRange and squeezeN, title = 'Squeezing Range', style = selectedSQMarkerShape, location = location.belowbar, color = squeezeMarkerColor, size = size.tiny, textcolor = squeezeMarkerColor, text = 'SQ')
+// Squeeze Alert
+alertcondition(squeezeN, title = 'Squeezing Range', message = 'Squeezing Range')
+
+
+// -------- Mark 52W High and Low Candle ------
+high_bar = 0
+low_bar = 0
+if mark52WeeksHighAndLow and barstate.islast
+
+    // Search for the bar with the high/low values
+    for i = 0 to period52Weeks - 1
+        if i <= bar_index  // Make sure we don't look beyond available bars
+            if high[i] == high52W
+                high_bar := bar_index - i
+            if low[i] == low52W
+                low_bar := bar_index - i
+
+    // Label variables
+    var label highLabel = na
+    var label lowLabel = na
+    var line ray52WHLine = na
+    var line ray52WLLine = na
+
+    // Draw only on the last bar
+    // if barstate.islast
+    // Delete previous labels
+    if not na(highLabel)
+        label.delete(highLabel)
+    if not na(lowLabel)
+        label.delete(lowLabel)
+    if not na(ray52WHLine)
+        line.delete(ray52WHLine)
+    if not na(ray52WLLine)
+        line.delete(ray52WLLine)
+
+    // Add new lines at 52W High and Low
+    ray52WHLine := line.new(x1=high_bar,y1=high52W,x2=high_bar + 1,y2=high52W,extend=extend.right,color=high52WLineColor,width=lineWidth52WHighLow)
+    ray52WLLine := line.new(x1=low_bar,y1=low52W,x2=low_bar + 1,y2=low52W,extend=extend.right,color=low52WLineColor,width=lineWidth52WHighLow)
+
+    // Add new labels at 52W High and Low
+    highLabel := label.new(high_bar+15, high52W, text="52W ▲ " + str.tostring(high52W, format.mintick), style=label.style_label_down, color= color.new(color.black, 100), textcolor=high52WLineColor, size = textSize52WHL == "tiny" ? size.tiny : textSize52WHL == "small" ? size.small : textSize52WHL == "normal" ? size.normal : textSize52WHL == "large" ? size.large : size.huge)
+    lowLabel := label.new(low_bar+15, low52W, text="52W ▼ " + str.tostring(low52W, format.mintick), style=label.style_label_up, color=color.new(color.black, 100), textcolor=low52WLineColor, size = textSize52WHL == "tiny" ? size.tiny : textSize52WHL == "small" ? size.small : textSize52WHL == "normal" ? size.normal : textSize52WHL == "large" ? size.large : size.huge)
+
+
+
+// Alerts
+alertcondition(avgTurnoverInCr >= thresholdTurnover, title="Turnover (In Cr) >= Threshold", message="Turnover (In Cr) >= Threshold")
+alertcondition(adr >= thresholdADR, title="ADR % >= Threshold", message="ADR % >= Threshold")
+alertcondition(atrPercent >= thresholdATRP, title="ATR % >= Threshold", message="ATR % >= Threshold")
+alertcondition(minervini_trend_template_conditions, title="Minervini Trend Template", message="Minervini Trend Template")
+alertcondition(rs >= thresholdRelStrength, title="Relative Strength (RS) >= Threshold", message="Relative Strength (RS) >= Threshold")
+alertcondition(rsScore >= thresholdRSScore, title="RS Score >= Threshold", message="RS Score >= Threshold")
+
+// Inside Bar Alerts
+alertcondition(isInside() == bullishBar, title = 'Bullish Inside Bar', message = 'Bullish Inside Bar')
+alertcondition(isInside() == bearishBar, title = 'Bearish Inside Bar', message = 'Bearish Inside Bar')
+
+// Tightness Alert
+alertcondition(isTight, title="Tightness", message="Tightness")
+
+alertcondition(pct_below_52W_high <= threshold52WHigh, title="52W High <= Threshold", message="52W High <= Threshold")
+alertcondition(pct_above_52W_low >= threshold52WLow, title="52W Low >= Threshold", message="52W Low >= Threshold")
+
+
+alertcondition(marketCapInCr >= thresholdMcap, title="MarketCap (In Cr) >= Threshold", message="MarketCap (In Cr) >= Threshold")
+alertcondition(rvolPercent >= thresholRVol, title="RVol >= Threshold", message="RVol >= Threshold")
+alertcondition(atrExtension >= thresholdMAExtInATR, title="Extended", message="Extended")
+alertcondition(atrExtension <= thresholdMAExtInATR, title="Not Extended", message="Not Extended")
+// Purple Dot Alert
+alertcondition(roc_condition and volume_condition, title="PowerBar (Purple Dot)", message="PowerBar (Purple Dot)")
+
+
+// Moving Averages Alerts
+alertcondition(close > ma1, title="Price Above MA-1", message="Price Above MA-1")
+alertcondition(close > ma2, title="Price Above MA-2", message="Price Above MA-2")
+alertcondition(close > ma3, title="Price Above MA-3", message="Price Above MA-3")
+alertcondition(close > ma4, title="Price Above MA-4", message="Price Above MA-4")
+alertcondition(ma1 > ma2, title="MA-1 Above MA-2", message="MA-1 Above MA-2")
+alertcondition(ma2 > ma3, title="MA-2 Above MA-3", message="MA-2 Above MA-3")
+alertcondition(ma3 > ma4, title="MA-3 Above MA-4", message="MA-3 Above MA-4")
+
+// MA Crossover Alerts
+alertcondition(ta.crossover(shortMA, longMA), title="Bullish MA Crossover", message="Bullish MA Crossover")
+alertcondition(ta.crossunder(shortMA, longMA), title="Bearish MA Crossover", message="Bearish MA Crossover")
+
+
+//  ----------- Pine Screener Filters ---------
+// Minimum and Maximum Price Filters
+alertcondition(close >= minimumPrice, title="Price >= Threshold", message="Price >= Threshold")
+alertcondition(close <= maximumPrice, title="Price <= Threshold", message="Price <= Threshold")
+
+// Minimum and Maximum Daily Price % Change 
+percChange1D = ((close - close[1]) / close[1]) * 100
+alertcondition(percChange1D <= maxDailyPriceChange, title="Price Change (%) <= Threshold", message="Price Change (%) <= Threshold")
+alertcondition(percChange1D >= minDailyPriceChange, title="Price Change (%) >= Threshold", message="Price Change (%) >= Threshold")
+
+
+
+// Function to get currency symbol from code
+getSymbol(code) =>
+    code == "USD" ? "$" : code == "EUR" ? "€" : code == "GBP" ? "£" : code == "INR" ? "₹" : code == "JPY" ? "¥" : code == "CNY" ? "¥" : code == "CAD" ? "C$" : code == "AUD" ? "A$" : code == "CHF" ? "CHF" : code == "RUB" ? "₽" : code == "KRW" ? "₩" : code == "SGD" ? "S$" : code == "HKD" ? "HK$" : code == "NZD" ? "NZ$" : code == "ZAR" ? "R" : "?"
+
+
+if barstate.islast and displayTable
+
+    // Determine Background Color
+    bgColorADR = adr >= thresholdADR ? color.green : color.red
+    bgColorATRP = atrPercent >= thresholdATRP ? color.green : color.red
+    bgColorRS = rs >= thresholdRelStrength ? color.green : color.red
+    bgColorRVol = close >= open ? rvolPercent >= thresholRVol ?  color.green : ColorBackground : rvolPercent >= thresholRVol ? color.red : ColorBackground
+    bgColorAvgTurnover = avgTurnoverInCr >= thresholdTurnover ? color.green : color.red
+    bgColorRSRating = rsScore < thresholdRSScore ? color.red : rsScore >= 70 ? color.green : ColorBackground
+    bgColorExten = atrExtension >= thresholdMAExtInATR ? color.red : ColorBackground
+    bgColorMacp = marketCapInCr >= thresholdMcap ? color.green : color.red
+    bgColorTrend = direction < 0 ? color.green : color.red
+    bgColorMTT = na(dclose[252]) ? ColorBackground : minervini_trend_template_conditions ? color.green : color.red
+    bgColor52WHigh = na(pct_below_52W_high) ? ColorBackground : pct_below_52W_high <= threshold52WHigh ? color.green : color.red
+    bgColor52WLow = na(pct_above_52W_low) ? ColorBackground : pct_above_52W_low >= threshold52WLow ? color.green : color.red
+
+    currencyCode = syminfo.currency
+    currencySymbol = getSymbol(currencyCode)
+
+    labelMAExtension := "Ext. from " + str.tostring(maExtLength) + "-" + maType
+    maExtStringVal = str.tostring(atrExtension, "#.##") + " atr (" + str.tostring(math.round(maExtPercent,2)) + "%)"
+
+
+    if tableOrientation == "Vertical"
+
+        var table verticalTable = table.new(tableposY + "_" + tableposX, 2, 17, frame_color=color.new(#999999, 50), frame_width=1,border_color=color.new(#999999, 50), border_width=1)
+
+        if displayADR
+            table.cell(verticalTable, 0, 0, text=labelADR, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 0, text=na(adr) ? '-' : str.tostring(math.round(adr,2)) + " %", text_halign=text.align_center, bgcolor=bgColorADR, text_color=TextCol, text_size=tablesize)
+
+        if displayATRP
+            table.cell(verticalTable, 0, 1, text=labelATRPer, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 1, text=na(atrPercent) ? '-' : str.tostring(math.round(atrPercent,2)) + " %", text_halign=text.align_center, bgcolor=bgColorATRP, text_color=TextCol, text_size=tablesize)
+
+        if displayATR
+            table.cell(verticalTable, 0, 2, text=labelATR, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 2, text=na(atr) ? '-' : str.tostring(math.round(atr,2)), text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+
+        if displayRelStrength
+            table.cell(verticalTable, 0, 3, text=labelRS, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)    
+            table.cell(verticalTable, 1, 3, text=na(rs) ? '-' : str.tostring(math.round(rs,2)), text_halign=text.align_center, bgcolor=bgColorRS, text_color=TextCol, text_size=tablesize)        
+
+        if displayRSRating
+            table.cell(verticalTable, 0, 4, text=labelRSRating, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 4, text=na(rsScore) ? '-' : str.tostring(math.round(rsScore)), text_halign=text.align_center, bgcolor=bgColorRSRating, text_color=TextCol, text_size=tablesize)
+
+
+        if displayRVol
+            table.cell(verticalTable, 0, 5, text=labelRVol, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 5, text=na(rvolPercent) ? '-' : str.tostring(math.round(rvolPercent,2)) +" %", text_halign=text.align_center, bgcolor=bgColorRVol, text_color=TextCol, text_size=tablesize)
+
+        if displayTurnover
+            table.cell(verticalTable, 0, 6, text="Avg" + currencySymbol + "Vol", text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 6, text=na(avgTurnoverInCr) ? '-' : str.tostring(avgTurnoverInCr, "#.##" + " Cr") , text_halign=text.align_center, bgcolor=bgColorAvgTurnover, text_color=TextCol, text_size=tablesize)
+
+        if displayMAExtension
+            table.cell(verticalTable, 0, 7, text=labelMAExtension, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 7, text=na(maExtPercent) ? '-' : maExtStringVal, text_halign=text.align_center, bgcolor=bgColorExten, text_color=TextCol, text_size=tablesize)
+
+        if display52WHigh
+            table.cell(verticalTable, 0, 8, text=label52WHigh, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 8, text=na(pct_below_52W_high) ? '-' : str.tostring(pct_below_52W_high) + " %", text_halign=text.align_center, bgcolor=bgColor52WHigh, text_color=TextCol, text_size=tablesize)
+
+        if display52WLow
+            table.cell(verticalTable, 0, 9, text=label52WLow, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 9, text=na(pct_above_52W_low) ? '-' : str.tostring(pct_above_52W_low) + " %", text_halign=text.align_center, bgcolor=bgColor52WLow, text_color=TextCol, text_size=tablesize)
+
+        if displayMarketCap
+            table.cell(verticalTable, 0, 10, text=labelMarketCap, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 10, text=na(marketCapInCr) ? '-' :  str.tostring(math.round(marketCapInCr,2)) + " Cr", text_halign=text.align_center, bgcolor=bgColorMacp, text_color=TextCol, text_size=tablesize)
+
+        if displayFreeFloat
+            table.cell(verticalTable, 0, 11, text=labelFreeFloat, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 11, text=na(freeFloatPct) ? '-' : str.tostring(math.round(freeFloatPct,2)) + " %", text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+        if displayTrend
+            table.cell(verticalTable, 0, 12, text=labelTrend, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 12, text=na(trend) ? '-' : trend, text_halign=text.align_center, bgcolor=bgColorTrend, text_color=TextCol, text_size=tablesize)
+
+        if displayMinerviniTrendTemplate
+            table.cell(verticalTable, 0, 13, text=lableMinerviniTT, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 13, text=na(minervini_trend_template_status) ? '-' : minervini_trend_template_status, text_halign=text.align_center, bgcolor=bgColorMTT, text_color=TextCol, text_size=tablesize)
+
+        if displaySector
+            table.cell(verticalTable, 0, 14, text=labelSector, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 14, text=na(sector) ? '-' : sector, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+        if displayIndustry
+            table.cell(verticalTable, 0, 15, text=labelIndustry, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(verticalTable, 1, 15, text=na(industry) ? '-' : industry, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+    else
+
+        var table horizontalTable = table.new(tableposY + "_" + tableposX, 17, 2, frame_color=color.new(#999999, 50), frame_width=1,border_color=color.new(#999999, 50), border_width=1)
+
+        if displayADR
+            table.cell(horizontalTable, 0, 0, text=labelADR, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 0, 1, text=na(adr) ? '-' : str.tostring(math.round(adr,2)) + " %", text_halign=text.align_center, bgcolor=bgColorADR, text_color=TextCol, text_size=tablesize)
+
+        if displayATRP
+            table.cell(horizontalTable, 1, 0, text=labelATRPer, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 1, 1, text=na(atrPercent) ? '-' : str.tostring(math.round(atrPercent,2)) + " %", text_halign=text.align_center, bgcolor=bgColorATRP, text_color=TextCol, text_size=tablesize)
+
+        if displayATR
+            table.cell(horizontalTable, 2, 0, text=labelATR, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 2, 1, text=na(atr) ? '-' : str.tostring(math.round(atr,2)), text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+        if displayRelStrength
+            table.cell(horizontalTable, 3, 0, text=labelRS, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)    
+            table.cell(horizontalTable, 3, 1, text=na(rs) ? '-' : str.tostring(math.round(rs,2)), text_halign=text.align_center, bgcolor=bgColorRS, text_color=TextCol, text_size=tablesize)        
+
+        if displayRSRating
+            table.cell(horizontalTable, 4, 0, text=labelRSRating, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 4, 1, text=na(rsScore) ? '-' : str.tostring(math.round(rsScore)), text_halign=text.align_center, bgcolor=bgColorRSRating, text_color=TextCol, text_size=tablesize)
+
+        if displayRVol
+            table.cell(horizontalTable, 5, 0, text=labelRVol, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 5, 1, text=na(rvolPercent) ? '-' : str.tostring(math.round(rvolPercent,2)) +" %", text_halign=text.align_center, bgcolor=bgColorRVol, text_color=TextCol, text_size=tablesize)
+
+        if displayTurnover
+            table.cell(horizontalTable, 6, 0, text="Avg" + currencySymbol + "Vol", text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 6, 1, text=na(avgTurnoverInCr) ? '-' : str.tostring(avgTurnoverInCr, "#.##" + " Cr") , text_halign=text.align_center, bgcolor=bgColorAvgTurnover, text_color=TextCol, text_size=tablesize)
+
+        if displayMAExtension
+            table.cell(horizontalTable, 7, 0, text=labelMAExtension, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 7, 1, text=na(maExtPercent) ? '-' : maExtStringVal, text_halign=text.align_center, bgcolor=bgColorExten, text_color=TextCol, text_size=tablesize)
+
+        if display52WHigh
+            table.cell(horizontalTable, 8, 0, text=label52WHigh, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 8, 1, text=na(pct_below_52W_high) ? '-' : str.tostring(pct_below_52W_high) + " %", text_halign=text.align_center, bgcolor=bgColor52WHigh, text_color=TextCol, text_size=tablesize)
+
+        if display52WLow
+            table.cell(horizontalTable, 9, 0, text=label52WLow, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 9, 1, text=na(pct_above_52W_low) ? '-' : str.tostring(pct_above_52W_low) + " %", text_halign=text.align_center, bgcolor=bgColor52WLow, text_color=TextCol, text_size=tablesize)
+
+        if displayMarketCap
+            table.cell(horizontalTable, 10, 0, text=labelMarketCap, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 10, 1, text=na(marketCapInCr) ? '-' :  str.tostring(math.round(marketCapInCr,2)) + " Cr", text_halign=text.align_center, bgcolor=bgColorMacp, text_color=TextCol, text_size=tablesize)
+
+        if displayFreeFloat
+            table.cell(horizontalTable, 11, 0, text=labelFreeFloat, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 11, 1, text=na(freeFloatPct) ? '-' : str.tostring(math.round(freeFloatPct,2)) + " %", text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+        if displayTrend
+            table.cell(horizontalTable, 12, 0, text=labelTrend, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 12, 1, text=na(trend) ? '-' : trend, text_halign=text.align_center, bgcolor=bgColorTrend, text_color=TextCol, text_size=tablesize)
+
+        if displayMinerviniTrendTemplate
+            table.cell(horizontalTable, 13, 0, text=lableMinerviniTT, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 13, 1, text=na(minervini_trend_template_status) ? '-' : minervini_trend_template_status, text_halign=text.align_center, bgcolor=bgColorMTT, text_color=TextCol, text_size=tablesize)
+
+        if displaySector
+            table.cell(horizontalTable, 14, 0, text=labelSector, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 14, 1, text=na(sector) ? '-' : sector, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+
+        if displayIndustry
+            table.cell(horizontalTable, 15, 0, text=labelIndustry, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
+            table.cell(horizontalTable, 15, 1, text=na(industry) ? '-' : industry, text_halign=text.align_center, bgcolor=ColorBackground, text_color=TextCol, text_size=tablesize)
